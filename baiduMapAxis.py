@@ -17,11 +17,12 @@ output_col_name = {1:"编号", 2:"订单号", 3:"经度", 4:"纬度"}
 
 class ExcueteFile(object):
 
-    def __init__(self,input_file, output_file, anchor_col_letter, address_cel_letter, chinese_code, method="geocoder"):
+    def __init__(self,input_file, output_file, anchor_col_letter, address_cel_letter, start_row, chinese_code, method="geocoder"):
         self.input_file = input_file
         self.output_file = output_file
         self.anchor_col = utils.get_excel_col_number(anchor_col_letter)
         self.address_col = utils.get_excel_col_number(address_cel_letter)
+        self.start_row = start_row
         self.chinese_code = chinese_code
         self.method = method
 
@@ -86,7 +87,52 @@ class ExcueteFile(object):
 
         return [lng, lat]
 
+    def read_csv(self, filepath, start_row):
+        lst = []
 
+        csvReader = csv.reader(file(filepath, 'rb'))
+        for i in xrange(start_row-1):
+            csvReader.next()
+        for row in csvReader:
+            lst.append([row[self.anchor_col], row[self.address_col]])
+        return lst
+
+    def read_excel(self, filepath, start_row):
+        lst = []
+        with xlrd.open_workbook(filepath) as workbook:
+            sheet = workbook.sheet_by_index(0)
+            rown = sheet.nrows
+
+            for r in range(start_row-1, rown):
+                lst.append([sheet.cell_value(r, self.anchor_col),
+                            sheet.cell_value(r, self.address_col)])
+        return lst
+
+    def read(self, filepath, start_row):
+        if filepath.endswith(".csv"):
+            return self.read_csv(filepath, start_row)
+        elif filepath.endswith((".xls", ".xlsx")):
+            return self.read_excel(filepath, start_row)
+
+    def multiSearch(self):
+        addresslist = self.read(self.input_file, self.start_row)
+
+        axislist = []
+        i = self.start_row
+        print "filelength= ", len(addresslist)
+        for address in addresslist:
+
+            try:
+
+                axis = self.getAxis(address[1])
+                print i, axis
+                axislist.append([i, address[0], axis[0], axis[1]])
+            except:
+                print i, address
+            finally:
+                i += 1
+
+        return axislist
 
     @staticmethod
     def writeExcel(axislist, filepath):
@@ -109,93 +155,25 @@ class ExcueteFile(object):
 
         wb.save(filepath)
 
-class CSVFile(ExcueteFile):
-
-
-    # def __init__(self, anchor_col_letter, address_cel_letter, chinese_code):
-    #     self.anchor_col = utils.get_excel_col_number(anchor_col_letter)
-    #     self.address_col = utils.get_excel_col_number(address_cel_letter)
-    #     self.chinese_code = chinese_code
-
-    def read(self, filepath):
-        lst = []
-
-        csvReader = csv.reader(file(filepath, 'rb'))
-        for i in xrange(3):
-            csvReader.next()
-        for row in csvReader:
-            lst.append([row[self.anchor_col], row[self.address_col]])
-        return lst
-
-    def multiSearch(self):
-        addresslist = self.read(self.input_file)
-
-        axislist = []
-        i = 1
-        print "filelength= ", len(addresslist)
-        for address in addresslist:
-
-            try:
-
-                axis = self.getAxis(address[1])
-                print i, axis
-                axislist.append([i, address[0], axis[0], axis[1]])
-            except:
-                print i, address
-            finally:
-                i += 1
-
-        return axislist
-
     def run(self):
         axislist = self.multiSearch()
         self.writeExcel(axislist, self.output_file)
 
-class ExcelFile(ExcueteFile):
-
-
-    def read(self, filepath):
-        lst = []
-        with xlrd.open_workbook(filepath) as workbook:
-            sheet = workbook.sheet_by_index(0)
-            rown = sheet.nrows
-
-            for r in range(rown):
-                lst.append([sheet.cell_value(r, self.anchor_col),
-                            sheet.cell_value(r, self.address_col)])
-        return lst
-
-    def multiSearch(self):
-        addresslist = self.read(self.input_file)
-        #print addresslist
-        #print len(addresslist)
-        axislist = []
-        i = 1
-        print "filelength= ", len(addresslist)
-        for address in addresslist:
-            try:
-                axis = self.getAxis(address[1], ak_mcm)
-                print i, axis
-                axislist.append([i, address[0], axis[0], axis[1]])
-            except:
-                print i, address
-            finally:
-                i += 1
-
-        return axislist
-
-    def run(self):
-        axislist = self.multiSearch()
-        self.writeExcel(axislist, self.output_file)
 
 if __name__ == "__main__":
-    # ExcelFile(r"F:\视频组\投诉\4-13\B2I投诉工单-广州（原始）.xlsx".decode("utf-8").encode("GBK"),
-    #           r"F:\视频组\投诉\4-13\B2I投诉工单-广州（原始）_result.xlsx".decode("utf-8").encode("GBK"),
-    #           "P",
-    #           "G",
-    #           "unicode").run()
-    CSVFile(r"F:\视频组\地址经纬度\bilibili广州.csv".decode("utf-8").encode("GBK"),
-              r"F:\视频组\地址经纬度\bilibili广州_result.xlsx".decode("utf-8").encode("GBK"),
-              "A",
-              "Q",
-              "GBK").run()
+    ExcueteFile(#输入文件路径
+                r"F:\视频组\投诉\4-13\B2I投诉工单-广州（原始）.xlsx".decode("utf-8").encode("GBK"),
+                #输出文件路径
+                r"F:\视频组\投诉\4-13\B2I投诉工单-广州（原始）_result.xlsx".decode("utf-8").encode("GBK"),
+                "P",         #锚定列
+                "G",         #地址列
+                2,           #数据起始行号
+                "unicode"   #文件中文编码，一般是GBK，或者unicode
+                ).run()
+    # ExcueteFile(r"F:\视频组\地址经纬度\bilibili广州.csv".decode("utf-8").encode("GBK"),
+    #         r"F:\视频组\地址经纬度\bilibili广州_result.xlsx".decode("utf-8").encode("GBK"),
+    #         "A",
+    #         "Q",
+    #         2,
+    #         "GBK").run()
+
